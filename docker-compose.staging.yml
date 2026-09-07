@@ -1,0 +1,66 @@
+# Staging environment
+#
+# IMPORTANT: All environment variables MUST be set in .env file.
+# No default values are provided for security reasons.
+# If a required variable is missing, the container will fail to start.
+services:
+  db:
+    image: mysql:8.0
+    container_name: starter-mysql-staging
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - starter-network
+
+  wordpress:
+    image: wordpress:7.1-php8.3-apache
+    container_name: starter-wordpress-staging
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: ${MYSQL_USER}
+      WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
+      WORDPRESS_DB_NAME: ${MYSQL_DATABASE}
+      WORDPRESS_DEBUG: 'true'
+      REVALIDATION_SECRET: ${REVALIDATION_SECRET}
+      NEXTJS_REVALIDATE_URL: ${NEXTJS_REVALIDATE_URL}
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./apps/cms/plugins/starter-cors:/var/www/html/wp-content/plugins/starter-cors
+      - ./apps/cms/plugins/starter-webhook:/var/www/html/wp-content/plugins/starter-webhook
+      - ./apps/cms/themes:/var/www/html/wp-content/themes/custom
+    ports:
+      - '12080:80'
+    networks:
+      - starter-network
+
+  nextjs:
+    image: ${NEXTJS_IMAGE:-nextjs-wordpress-starter/web:staging}
+    container_name: starter-nextjs-staging
+    restart: unless-stopped
+    depends_on:
+      - wordpress
+    environment:
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+      WORDPRESS_API_URL: ${WORDPRESS_API_URL}
+      NODE_ENV: production
+    ports:
+      - '3000:3000'
+    networks:
+      - starter-network
+
+volumes:
+  db_data:
+  wordpress_data:
+
+networks:
+  starter-network:
+    driver: bridge

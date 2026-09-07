@@ -1,0 +1,64 @@
+﻿# Git
+.git
+.gitignore
+.github
+
+# Dependencies (installed fresh in container)
+node_modules
+**/node_modules
+
+# Build outputs (rebuilt in container)
+.next
+**/.next
+.turbo
+**/.turbo
+dist
+**/dist
+
+# Development
+.vscode
+.kiro
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage
+.nyc_output
+
+# Environment files (passed as build args)
+.env
+.env.*
+!.env.example
+
+# Documentation
+README.md
+docs
+specs
+*.md
+!Dockerfile.md
+
+# Assets not needed in container
+assets
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# CI/CD
+.github
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Showcase app (not deployed) - exclude all except package.json for workspace resolution
+apps/showcase
+!apps/showcase/package.json
+
+# CMS files (WordPress runs separately) - exclude all except package.json for workspace resolution
+apps/cms
+!apps/cms/package.json

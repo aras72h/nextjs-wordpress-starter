@@ -1,0 +1,64 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: starter-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-starter_wp}
+      MYSQL_USER: ${MYSQL_USER:-starter}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-starterpass}
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - '3306:3306'
+    networks:
+      - starter-network
+
+  wordpress:
+    image: wordpress:7.1-php8.3-apache
+    container_name: starter-wordpress
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: ${MYSQL_USER:-starter}
+      WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD:-starterpass}
+      WORDPRESS_DB_NAME: ${MYSQL_DATABASE:-starter_wp}
+      WORDPRESS_DEBUG: 'true'
+      REVALIDATION_SECRET: ${REVALIDATION_SECRET:-local-secret}
+      NEXTJS_REVALIDATE_URL: ${NEXTJS_REVALIDATE_URL:-http://host.docker.internal:3000/api/revalidate}
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./apps/cms/plugins/starter-cors:/var/www/html/wp-content/plugins/starter-cors
+      - ./apps/cms/plugins/starter-webhook:/var/www/html/wp-content/plugins/starter-webhook
+      - ./apps/cms/themes:/var/www/html/wp-content/themes/custom
+    ports:
+      - '12080:80'
+    networks:
+      - starter-network
+
+  # phpMyAdmin - LOCAL DEV ONLY
+  # Not included in staging/production to save resources
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: starter-phpmyadmin
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+    ports:
+      - '12081:80'
+    networks:
+      - starter-network
+
+volumes:
+  db_data:
+  wordpress_data:
+
+networks:
+  starter-network:
+    driver: bridge

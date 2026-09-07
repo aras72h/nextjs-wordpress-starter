@@ -1,0 +1,180 @@
+name: Server Health Check
+
+on:
+  workflow_dispatch: # Manual trigger only - enable schedule after production is deployed
+
+jobs:
+  check-production:
+    name: Production Server Health
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check Production Server
+        uses: appleboy/ssh-action@v1
+        env:
+          PROD_SITE_URL: ${{ secrets.PROD_SITE_URL }}
+          REGISTRY_HOST: ${{ secrets.REGISTRY_HOST }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: PROD_SITE_URL,REGISTRY_HOST
+          script: |
+            set -e
+
+            echo "🏥 Health Check: Production Server (${{ secrets.SSH_HOST }})"
+            echo "=============================================="
+            echo ""
+
+            # 1. Disk Space Check
+            echo "📊 Disk Space:"
+            DISK_USAGE=$(df -h / | awk 'NR==2 {print $5}' | sed 's/%//')
+            df -h / | grep -v Filesystem
+            echo ""
+
+            if [ "$DISK_USAGE" -gt 90 ]; then
+              echo "❌ CRITICAL: Disk usage is ${DISK_USAGE}% (> 90%)"
+              exit 1
+            elif [ "$DISK_USAGE" -gt 80 ]; then
+              echo "⚠️  WARNING: Disk usage is ${DISK_USAGE}% (> 80%)"
+            else
+              echo "✅ Disk usage: ${DISK_USAGE}% (healthy)"
+            fi
+            echo ""
+
+            # 2. Docker Disk Usage
+            echo "🐳 Docker Disk Usage:"
+            docker system df
+            echo ""
+
+            # 3. Container Status
+            echo "📦 Container Status:"
+            cd /opt/apps/nextjs-wordpress-starter
+            docker compose -f docker-compose.prod.yml ps
+            echo ""
+
+            # Check if all containers are running
+            RUNNING=$(docker compose -f docker-compose.prod.yml ps | grep "Up" | wc -l)
+            TOTAL=3  # db, wordpress, nextjs
+
+            if [ "$RUNNING" -ne "$TOTAL" ]; then
+              echo "❌ CRITICAL: Only $RUNNING/$TOTAL containers running"
+              exit 1
+            else
+              echo "✅ All containers running ($RUNNING/$TOTAL)"
+            fi
+            echo ""
+
+            # 4. Docker Images Count
+            echo "🖼️  Docker Images:"
+            IMAGE_COUNT=$(docker images "${{ secrets.REGISTRY_HOST }}/nextjs-wordpress-starter/web" | grep -v REPOSITORY | wc -l)
+            echo "Total starter images: $IMAGE_COUNT"
+            docker images "${{ secrets.REGISTRY_HOST }}/nextjs-wordpress-starter/web" --format "table {{.Tag}}\t{{.Size}}\t{{.CreatedSince}}"
+            echo ""
+
+            if [ "$IMAGE_COUNT" -gt 15 ]; then
+              echo "⚠️  WARNING: $IMAGE_COUNT images found (cleanup may be needed)"
+            else
+              echo "✅ Image count healthy ($IMAGE_COUNT images)"
+            fi
+            echo ""
+
+            # 5. Website Accessibility
+            echo "🌐 Website Accessibility:"
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$PROD_SITE_URL")
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ $PROD_SITE_URL responding (HTTP $HTTP_CODE)"
+            else
+              echo "❌ CRITICAL: $PROD_SITE_URL not responding (HTTP $HTTP_CODE)"
+              exit 1
+            fi
+            echo ""
+
+            # 6. Memory Usage
+            echo "💾 Memory Usage:"
+            free -h
+            echo ""
+
+            MEMORY_USAGE=$(free | awk '/Mem:/ {printf("%.0f", $3/$2 * 100)}')
+            if [ "$MEMORY_USAGE" -gt 90 ]; then
+              echo "⚠️  WARNING: Memory usage is ${MEMORY_USAGE}%"
+            else
+              echo "✅ Memory usage: ${MEMORY_USAGE}%"
+            fi
+            echo ""
+
+            # 7. Recent Docker Logs (check for errors)
+            echo "📋 Recent Errors in Logs (last 50 lines):"
+            docker compose -f docker-compose.prod.yml logs --tail 50 | grep -i "error\|critical\|fatal" || echo "✅ No critical errors found"
+            echo ""
+
+            echo "=============================================="
+            echo "✅ Health check complete"
+
+  check-staging:
+    name: Staging Server Health
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check Staging Server
+        uses: appleboy/ssh-action@v1
+        env:
+          STAGING_SITE_URL: ${{ secrets.STAGING_SITE_URL }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: STAGING_SITE_URL
+          script: |
+            set -e
+
+            echo "🏥 Health Check: Staging Server (${{ secrets.STAGING_HOST }})"
+            echo "=================================================="
+            echo ""
+
+            # 1. Disk Space Check
+            echo "📊 Disk Space:"
+            DISK_USAGE=$(df -h / | awk 'NR==2 {print $5}' | sed 's/%//')
+            df -h / | grep -v Filesystem
+            echo ""
+
+            if [ "$DISK_USAGE" -gt 90 ]; then
+              echo "❌ CRITICAL: Disk usage is ${DISK_USAGE}% (> 90%)"
+              exit 1
+            elif [ "$DISK_USAGE" -gt 80 ]; then
+              echo "⚠️  WARNING: Disk usage is ${DISK_USAGE}% (> 80%)"
+            else
+              echo "✅ Disk usage: ${DISK_USAGE}% (healthy)"
+            fi
+            echo ""
+
+            # 2. Container Status
+            echo "📦 Container Status:"
+            cd /opt/apps/nextjs-wordpress-starter-staging
+            docker compose -f docker-compose.staging.yml ps
+            echo ""
+
+            RUNNING=$(docker compose -f docker-compose.staging.yml ps | grep "Up" | wc -l)
+            TOTAL=3  # db, wordpress, nextjs
+
+            if [ "$RUNNING" -ne "$TOTAL" ]; then
+              echo "⚠️  WARNING: Only $RUNNING/$TOTAL containers running"
+            else
+              echo "✅ All containers running ($RUNNING/$TOTAL)"
+            fi
+            echo ""
+
+            # 3. Website Accessibility
+            echo "🌐 Website Accessibility:"
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_SITE_URL")
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ $STAGING_SITE_URL responding (HTTP $HTTP_CODE)"
+            else
+              echo "⚠️  WARNING: $STAGING_SITE_URL not responding (HTTP $HTTP_CODE)"
+            fi
+            echo ""
+
+            echo "=================================================="
+            echo "✅ Health check complete"

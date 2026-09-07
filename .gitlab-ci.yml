@@ -1,0 +1,274 @@
+# GitLab CI/CD Configuration
+# Local GitLab instance at 192.168.0.10
+#
+# Purpose:
+#   - CI tests (lint, type-check, build)
+#   - Staging deployment to local Docker (192.168.0.10)
+#   - Production deployment fallback (manual, when GitHub unavailable)
+#
+# Network Configuration:
+#   - All services run in Docker containers on 192.168.0.10
+#   - Services must be on same Docker network or use host.docker.internal
+#
+#   Option 1 (Recommended): Use Docker container names
+#     - pnpm mirror: http://nexus:8081/repository/npm-proxy/
+#     - Docker Hub mirror: http://docker-hub-mirror:5000
+#     - Requires: All containers on same Docker network
+#
+#   Option 2 (Windows): Use host.docker.internal
+#     - pnpm mirror: http://host.docker.internal:8081/repository/npm-proxy/
+#     - Docker Hub mirror: http://host.docker.internal:5047
+#     - Requires: Docker Desktop (Windows/Mac)
+#
+#   See: docs/DOCKER-NETWORK-SOLUTION.md for full guide
+
+# Mirror configuration
+# Docker Hub images  → pulled via Docker daemon mirror (port 5047, transparent)
+# GHCR images        → use 192.168.0.10:5048/<path> instead of ghcr.io/<path>
+# GitLab registry    → use 192.168.0.10:5049/<path> instead of registry.gitlab.com/<path>
+# npm/pnpm packages  → Nexus proxy on host.docker.internal:8081
+
+# Global variables — available in all jobs
+variables:
+  # pnpm install uses Nexus npm proxy instead of registry.npmjs.org
+  NPM_REGISTRY: 'http://host.docker.internal:8081/repository/npm-proxy/'
+
+# Default configuration
+default:
+  # node:20-alpine is a Docker Hub image — pulled transparently via port 5047 mirror
+  image: node:20-alpine
+  before_script:
+    # Install pnpm via npm using Nexus mirror — avoids corepack internet download
+    - npm install -g pnpm@10.15.0 --registry http://host.docker.internal:8081/repository/npm-proxy/
+    - pnpm config set registry http://host.docker.internal:8081/repository/npm-proxy/
+    - pnpm config set store-dir .pnpm-store
+
+# Cache configuration
+.pnpm-cache: &pnpm-cache
+  cache:
+    key:
+      files:
+        - pnpm-lock.yaml
+    paths:
+      - .pnpm-store
+      - node_modules
+      - apps/*/node_modules
+      - packages/*/node_modules
+
+# Stages definition
+stages:
+  - test
+  - build
+  - deploy
+
+#############################################
+# TEST STAGE
+#############################################
+
+infrastructure:test:
+  stage: test
+  # alpine:latest -> Docker Hub, pulled via port 5047 mirror (transparent)
+  image: alpine:latest
+  before_script: []
+  script:
+    - echo "================================================"
+    - echo " GitLab CI Infrastructure Test"
+    - echo "================================================"
+    - echo "Runner ID    - $CI_RUNNER_ID"
+    - echo "Runner tags  - $CI_RUNNER_TAGS"
+    - echo "GitLab URL   - $CI_SERVER_URL"
+    - echo "Project      - $CI_PROJECT_PATH"
+    - echo "Commit       - $CI_COMMIT_SHORT_SHA"
+    - echo "Branch       - $CI_COMMIT_REF_NAME"
+    - echo "Committer    - $CI_COMMIT_AUTHOR"
+    - echo "Time (UTC)   - $(date -u)"
+    - echo "================================================"
+    - echo ""
+    - echo "--- Connectivity checks ---"
+    - wget -q --spider --timeout=5 http://host.docker.internal:8081 && echo "Nexus (npm mirror)    OK" || echo "Nexus (npm mirror)    UNREACHABLE"
+    - wget -q --spider --timeout=5 http://host.docker.internal:5047/v2/ && echo "Docker Hub mirror     OK" || echo "Docker Hub mirror     UNREACHABLE"
+    - wget -q --spider --timeout=5 http://192.168.0.10 && echo "GitLab                OK" || echo "GitLab                UNREACHABLE"
+    - echo ""
+    - echo "Phase 1 CI/CD infrastructure test PASSED!"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+lint:
+  stage: test
+  <<: *pnpm-cache
+  script:
+    - echo "Installing dependencies..."
+    - pnpm install --frozen-lockfile
+    - echo "Running ESLint..."
+    - pnpm lint
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+type-check:
+  stage: test
+  <<: *pnpm-cache
+  script:
+    - echo "Installing dependencies..."
+    - pnpm install --frozen-lockfile
+    - echo "Running TypeScript type check..."
+    - pnpm type-check
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+#############################################
+# BUILD STAGE
+#############################################
+
+build:
+  stage: build
+  <<: *pnpm-cache
+  script:
+    - echo "Installing dependencies..."
+    - pnpm install --frozen-lockfile
+    - echo "Building all packages..."
+    - pnpm build
+    - echo "Verifying build outputs..."
+    - |
+      if [ ! -d "apps/web/.next" ]; then
+        echo "ERROR - apps/web/.next not found"
+        exit 1
+      fi
+      if [ ! -d "apps/showcase/.next" ]; then
+        echo "ERROR - apps/showcase/.next not found"
+        exit 1
+      fi
+      echo "All builds successful"
+  artifacts:
+    name: 'build-$CI_COMMIT_SHORT_SHA'
+    paths:
+      - apps/web/.next
+      - apps/showcase/.next
+      - packages/*/dist
+    expire_in: 1 day
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+#############################################
+# DEPLOY STAGE
+#############################################
+
+# Deploy to local staging (192.168.0.10)
+# Builds Docker image and runs container via host Docker socket
+# No dind needed - runner mounts /var/run/docker.sock directly
+deploy:staging:
+  stage: deploy
+  image: docker:24-cli
+  before_script: []
+  variables:
+    DOCKER_HOST: unix:///var/run/docker.sock
+    IMAGE: 192.168.0.10:5050/nextjs-wordpress-starter/web
+    APP: starter-staging
+    PORT: '13000'
+  script:
+    - echo "=== Staging Deploy === commit=$CI_COMMIT_SHORT_SHA branch=$CI_COMMIT_REF_NAME"
+    - echo "--- Build image ---"
+    - |
+      docker build \
+        --build-arg NPM_REGISTRY=http://host.docker.internal:8081/repository/npm-proxy/ \
+        -t "$IMAGE:$CI_COMMIT_SHORT_SHA" \
+        -t "$IMAGE:latest" \
+        .
+    - echo "--- Push to registry ---"
+    - docker login 192.168.0.10:5050 -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+    - docker push "$IMAGE:$CI_COMMIT_SHORT_SHA"
+    - docker push "$IMAGE:latest"
+    - echo "--- Deploy container ---"
+    - docker stop "$APP" 2>/dev/null || true
+    - docker rm "$APP" 2>/dev/null || true
+    - |
+      docker run -d \
+        --name "$APP" \
+        --restart unless-stopped \
+        -p "$PORT:3000" \
+        "$IMAGE:$CI_COMMIT_SHORT_SHA"
+    - echo "Deployed to http://192.168.0.10:$PORT"
+  environment:
+    name: staging
+    url: http://192.168.0.10:13000
+    on_stop: stop:staging
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "main"'
+      when: manual
+  needs:
+    - build
+
+# Stop staging environment
+stop:staging:
+  stage: deploy
+  image: docker:24-cli
+  before_script: []
+  variables:
+    DOCKER_HOST: unix:///var/run/docker.sock
+    APP: starter-staging
+  script:
+    - echo "Stopping staging..."
+    - docker stop "$APP" 2>/dev/null || true
+    - docker rm "$APP" 2>/dev/null || true
+    - echo "Stopped."
+  environment:
+    name: staging
+    action: stop
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "main"'
+      when: manual
+  needs: []
+
+# Deploy to production server (94.101.181.37)
+# Manual trigger - FALLBACK when GitHub Actions unavailable
+deploy:production:
+  stage: deploy
+  # alpine:latest → Docker Hub, pulled via port 5047 mirror (transparent)
+  image: alpine:latest
+  dependencies:
+    - build
+  before_script: []
+  script:
+    - echo "Deploy to Production (FALLBACK)"
+    - echo "================================================"
+    - echo "Environment - Production (configure SSH_HOST in CI variables)"
+    - echo "Commit - $CI_COMMIT_SHORT_SHA"
+    - echo "Branch/Tag - $CI_COMMIT_REF_NAME"
+    - echo "URL - $PROD_SITE_URL"
+    - echo "================================================"
+    - echo ""
+    - echo "WARNING - This is a FALLBACK deployment method"
+    - echo "WARNING - Primary deployment uses GitHub Actions (automatic on tag)"
+    - echo "WARNING - Use this ONLY when GitHub is unavailable"
+    - echo ""
+    - |
+      # Verify build artifacts exist
+      if [ -d "apps/web/.next" ]; then
+        echo "Next.js build artifacts found"
+      else
+        echo "ERROR - Next.js build artifacts missing"
+        exit 1
+      fi
+    - echo ""
+    - echo "Real deployment commands will be added in later phases"
+    - echo ""
+    - echo "Deployment will:"
+    - echo "  1. Build Docker image from Dockerfile"
+    - echo "  2. Push to registry (if configured)"
+    - echo "  3. SSH to production server"
+    - echo "  4. Pull and deploy latest image"
+    - echo ""
+    - echo "Production deployment job ready!"
+  environment:
+    name: production
+    url: $PROD_SITE_URL
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
+      when: manual
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+  needs:
+    - build
