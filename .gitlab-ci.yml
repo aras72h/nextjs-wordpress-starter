@@ -163,7 +163,7 @@ deploy:staging:
     DOCKER_HOST: unix:///var/run/docker.sock
     IMAGE: 192.168.0.10:5050/aras72h/nextjs-wordpress-starter/web
     APP: starter-staging
-    PORT: '13000'
+    PORT: '13001'
   script:
     - echo "=== Staging Deploy === commit=$CI_COMMIT_SHORT_SHA branch=$CI_COMMIT_REF_NAME"
     - echo "--- Build image ---"
@@ -189,7 +189,7 @@ deploy:staging:
     - echo "Deployed to http://192.168.0.10:$PORT"
   environment:
     name: staging
-    url: http://192.168.0.10:13000
+    url: http://192.168.0.10:13001
     on_stop: stop:staging
   rules:
     - if: '$CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "main"'
