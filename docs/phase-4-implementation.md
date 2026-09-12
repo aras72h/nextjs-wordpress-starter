@@ -13,6 +13,7 @@ By the end of this phase the site is fully functional with real content, SEO met
 and a working contact form.
 
 **Success Criteria:**
+
 - All 4 pages render with real WordPress content
 - Blog posts update within 60 seconds of publishing in WordPress
 - Contact form delivers email via SMTP
@@ -24,6 +25,7 @@ and a working contact form.
 ## Current State (Phase 2/3 Baseline)
 
 What already exists:
+
 - `apps/web/app/layout.tsx` — root layout with Inter font, English metadata
 - `apps/web/app/page.tsx` — placeholder homepage
 - `apps/web/app/globals.css` — design tokens, Tailwind directives
@@ -33,6 +35,7 @@ What already exists:
 - 4 placeholder posts, 4 categories, 1 sticky post
 
 What does NOT exist yet:
+
 - WordPress data fetching layer (`apps/web/lib/wordpress.ts`)
 - Blog list, single post, contact, 404 pages
 - `react-hook-form`, `zod`, `nodemailer` not installed
@@ -69,39 +72,46 @@ CONTACT_EMAIL_TO=your@email.com
 Central data-fetching module. All pages import from here — no page directly calls `fetch`.
 
 ```typescript
-const API = process.env.WORDPRESS_API_URL!
+const API = process.env.WORDPRESS_API_URL!;
 
 async function wpFetch<T>(path: string, revalidate = 60): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     next: { revalidate },
     headers: { 'Content-Type': 'application/json' },
-  })
-  if (!res.ok) throw new Error(`WordPress API error: ${res.status} ${path}`)
-  return res.json()
+  });
+  if (!res.ok) throw new Error(`WordPress API error: ${res.status} ${path}`);
+  return res.json();
 }
 
-export async function getPosts(page = 1, perPage = 10): Promise<{
-  posts: WPPost[]
-  total: number
-  totalPages: number
-}>
+export async function getPosts(
+  page = 1,
+  perPage = 10
+): Promise<{
+  posts: WPPost[];
+  total: number;
+  totalPages: number;
+}>;
 
-export async function getPostBySlug(slug: string): Promise<WPPost | null>
+export async function getPostBySlug(slug: string): Promise<WPPost | null>;
 
-export async function getStickyPosts(): Promise<WPPost[]>
+export async function getStickyPosts(): Promise<WPPost[]>;
 
-export async function getPostsByCategory(categorySlug: string, page = 1): Promise<{
-  posts: WPPost[]
-  total: number
-  totalPages: number
-}>
+export async function getPostsByCategory(
+  categorySlug: string,
+  page = 1
+): Promise<{
+  posts: WPPost[];
+  total: number;
+  totalPages: number;
+}>;
 
-export async function getCategories(): Promise<WPCategory[]>
+export async function getCategories(): Promise<WPCategory[]>;
 
-export async function getAllPostSlugs(): Promise<string[]>
+export async function getAllPostSlugs(): Promise<string[]>;
 ```
 
 **Cache strategy:**
+
 - `revalidate: 60` — homepage, blog list
 - `revalidate: 0` — `getAllPostSlugs` (build time only)
 - On-demand via `/api/revalidate` (Phase 5)
@@ -109,6 +119,7 @@ export async function getAllPostSlugs(): Promise<string[]>
 **Error handling:** Return `null` / empty array on fetch failure — never crash pages.
 
 **Acceptance:**
+
 - [ ] All functions exported and typed
 - [ ] `getPosts` reads pagination from `X-WP-Total` / `X-WP-TotalPages` headers
 - [ ] `getPostBySlug` returns `null` for missing posts
@@ -134,13 +145,13 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'nextjs-wp.arashworks.ir',
+        hostname: 'nws.arashworks.ir',
         pathname: '/wp-content/uploads/**',
       },
     ],
   },
-}
-module.exports = nextConfig
+};
+module.exports = nextConfig;
 ```
 
 ---
@@ -199,6 +210,7 @@ export default async function HomePage() {
 ```
 
 **Acceptance:**
+
 - [ ] Hero renders with correct text and GitHub link
 - [ ] 3 latest posts from WordPress render as BlogCards
 - [ ] BlogCard links go to `/blog/[slug]`
@@ -229,29 +241,32 @@ export default async function HomePage() {
 ```
 
 **URL structure:**
+
 - `/blog` — page 1, all categories
 - `/blog?page=2` — page 2
 - `/blog?category=tutorial` — filter by slug
 
 ```typescript
-export const revalidate = 60
+export const revalidate = 60;
 
 interface BlogPageProps {
-  searchParams: Promise<{ page?: string; category?: string }>
+  searchParams: Promise<{ page?: string; category?: string }>;
 }
 
 export default async function BlogPage({ searchParams }: BlogPageProps) {
-  const { page = '1', category } = await searchParams
+  const { page = '1', category } = await searchParams;
   // fetch posts and categories...
 }
 ```
 
 **Pagination component** (`apps/web/components/Pagination.tsx`):
+
 - `<Link>` based, no JavaScript needed
 - `?page=N` query params
 - Disabled state for first/last page
 
 **Acceptance:**
+
 - [ ] Posts display with correct titles and categories
 - [ ] Category filter works via URL params
 - [ ] Pagination renders when more than 10 posts exist
@@ -280,17 +295,19 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
 ```
 
 **Static generation:**
+
 ```typescript
 export async function generateStaticParams() {
-  const slugs = await getAllPostSlugs()
-  return slugs.map((slug) => ({ slug }))
+  const slugs = await getAllPostSlugs();
+  return slugs.map((slug) => ({ slug }));
 }
 
-export const dynamicParams = true
-export const revalidate = 60
+export const dynamicParams = true;
+export const revalidate = 60;
 ```
 
 **PostContent component** (`apps/web/components/PostContent.tsx`):
+
 ```tsx
 export function PostContent({ html }: { html: string }) {
   return (
@@ -298,26 +315,30 @@ export function PostContent({ html }: { html: string }) {
       className="prose prose-invert max-w-none"
       dangerouslySetInnerHTML={{ __html: html }}
     />
-  )
+  );
 }
 ```
 
 Install `@tailwindcss/typography`:
+
 ```bash
 pnpm add --filter @starter/web @tailwindcss/typography
 ```
+
 Add to `apps/web/tailwind.config.ts` plugins array.
 
 **SEO metadata:**
+
 ```typescript
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params
-  const post = await getPostBySlug(slug)
-  if (!post) return { title: 'Post not found | NWS' }
+  const { slug } = await params;
+  const post = await getPostBySlug(slug);
+  if (!post) return { title: 'Post not found | NWS' };
 
-  const title = post.yoast_head_json?.title ?? `${post.title.rendered} | NWS`
-  const description = post.yoast_head_json?.description
-    ?? post.excerpt.rendered.replace(/<[^>]*>/g, '').slice(0, 160)
+  const title = post.yoast_head_json?.title ?? `${post.title.rendered} | NWS`;
+  const description =
+    post.yoast_head_json?.description ??
+    post.excerpt.rendered.replace(/<[^>]*>/g, '').slice(0, 160);
 
   return {
     title,
@@ -329,11 +350,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         ? [post._embedded['wp:featuredmedia'][0].source_url]
         : [],
     },
-  }
+  };
 }
 ```
 
 **JSON-LD:**
+
 ```typescript
 const jsonLd = {
   '@context': 'https://schema.org',
@@ -347,12 +369,13 @@ const jsonLd = {
     name: 'nextjs-wordpress-starter',
     url: 'https://nextjs-wp.arashworks.ir',
   },
-}
+};
 ```
 
 **404 handling:** If `getPostBySlug` returns `null`, call `notFound()`.
 
 **Acceptance:**
+
 - [ ] Post content renders (headings, lists, code blocks, images)
 - [ ] Featured image via `next/image`
 - [ ] SEO title/description from Yoast with fallback
@@ -381,6 +404,7 @@ const jsonLd = {
 ```
 
 **Install packages:**
+
 ```bash
 pnpm add --filter @starter/web react-hook-form@^7.54.0 zod@^3.24.0 @hookform/resolvers@^3.9.0
 pnpm add --filter @starter/web nodemailer@^6.9.0
@@ -389,26 +413,31 @@ pnpm add --filter @starter/web -D @types/nodemailer
 
 **ContactForm** (`apps/web/components/ContactForm.tsx`) — Client Component:
 
-| Field | Type | Validation |
-|---|---|---|
-| name | text | required, min 2 chars |
-| email | email | required, valid format |
-| subject | text | required, min 3 chars |
-| message | textarea | required, 10-1000 chars |
+| Field   | Type          | Validation               |
+| ------- | ------------- | ------------------------ |
+| name    | text          | required, min 2 chars    |
+| email   | email         | required, valid format   |
+| subject | text          | required, min 3 chars    |
+| message | textarea      | required, 10-1000 chars  |
 | website | text (hidden) | must be empty (honeypot) |
 
 **Zod schema:**
+
 ```typescript
 const contactSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Enter a valid email'),
   subject: z.string().min(3, 'Subject must be at least 3 characters'),
-  message: z.string().min(10, 'Message must be at least 10 characters').max(1000),
+  message: z
+    .string()
+    .min(10, 'Message must be at least 10 characters')
+    .max(1000),
   website: z.string().max(0), // honeypot
-})
+});
 ```
 
 **API route** (`apps/web/app/api/contact/route.ts`):
+
 ```typescript
 export async function POST(request: Request) {
   const body = await request.json()
@@ -421,28 +450,36 @@ export async function POST(request: Request) {
 ```
 
 **Email utility** (`apps/web/lib/email.ts`):
-```typescript
-import nodemailer from 'nodemailer'
 
-export async function sendEmail({ to, subject, text }: {
-  to: string; subject: string; text: string
+```typescript
+import nodemailer from 'nodemailer';
+
+export async function sendEmail({
+  to,
+  subject,
+  text,
+}: {
+  to: string;
+  subject: string;
+  text: string;
 }) {
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT) || 587,
     secure: false,
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-  })
+  });
   await transporter.sendMail({
     from: `"NWS" <${process.env.SMTP_USER}>`,
     to,
     subject,
     text,
-  })
+  });
 }
 ```
 
 **Acceptance:**
+
 - [ ] Form validates client-side before submitting
 - [ ] Honeypot returns fake success
 - [ ] Email arrives at `CONTACT_EMAIL_TO`
@@ -455,14 +492,16 @@ export async function sendEmail({ to, subject, text }: {
 **File:** `apps/web/app/not-found.tsx`
 
 ```tsx
-import Link from 'next/link'
-import { Button } from '@starter/ui'
+import Link from 'next/link';
+import { Button } from '@starter/ui';
 
 export default function NotFound() {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-6 px-6 text-center">
       <h1 className="text-8xl font-bold text-primary">404</h1>
-      <h2 className="text-2xl font-semibold text-text-primary">Page not found</h2>
+      <h2 className="text-2xl font-semibold text-text-primary">
+        Page not found
+      </h2>
       <p className="text-text-secondary max-w-md">
         The page you are looking for does not exist or has been moved.
       </p>
@@ -470,7 +509,7 @@ export default function NotFound() {
         <Link href="/">Back to home</Link>
       </Button>
     </div>
-  )
+  );
 }
 ```
 
@@ -510,12 +549,15 @@ Create a stub now — full implementation in Phase 5.
 
 ```typescript
 export async function POST(request: Request) {
-  const secret = new URL(request.url).searchParams.get('secret')
+  const secret = new URL(request.url).searchParams.get('secret');
   if (secret !== process.env.REVALIDATION_SECRET) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
   // Phase 5: call revalidatePath() here
-  return Response.json({ revalidated: false, message: 'Phase 5 not yet implemented' })
+  return Response.json({
+    revalidated: false,
+    message: 'Phase 5 not yet implemented',
+  });
 }
 ```
 
@@ -573,6 +615,7 @@ apps/web/
 ## Acceptance Criteria
 
 ### Must Have
+
 - [ ] All 4 pages render with real WordPress content
 - [ ] Blog list paginates correctly
 - [ ] Single post has correct SEO metadata from Yoast (with fallback)
@@ -583,12 +626,14 @@ apps/web/
 - [ ] WordPress featured images via `next/image`
 
 ### Should Have
+
 - [ ] JSON-LD on single post pages
 - [ ] Share buttons on single post pages
 - [ ] Category filter on blog list
 - [ ] Lighthouse Performance > 90 on homepage
 
 ### Out of Scope
+
 - On-demand revalidation (Phase 5)
 - Real blog content (write later)
 - Search functionality
