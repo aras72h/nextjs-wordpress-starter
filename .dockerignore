@@ -55,10 +55,6 @@ docker-compose*.yml
 .DS_Store
 Thumbs.db
 
-# Showcase app (not deployed) - exclude all except package.json for workspace resolution
-apps/showcase
-!apps/showcase/package.json
-
 # CMS files (WordPress runs separately) - exclude all except package.json for workspace resolution
 apps/cms
 !apps/cms/package.json

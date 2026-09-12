@@ -79,10 +79,7 @@ jobs:
             echo "❌ apps/web/.next not found"
             exit 1
           fi
-          if [ ! -d "apps/showcase/.next" ]; then
-            echo "❌ apps/showcase/.next not found"
-            exit 1
-          fi
+
           echo "✅ All build artifacts created successfully"
           echo ""
           echo "🎉 Build infrastructure test PASSED!"

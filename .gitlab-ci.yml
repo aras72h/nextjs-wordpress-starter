@@ -136,16 +136,12 @@ build:
         echo "ERROR - apps/web/.next not found"
         exit 1
       fi
-      if [ ! -d "apps/showcase/.next" ]; then
-        echo "ERROR - apps/showcase/.next not found"
-        exit 1
-      fi
+      echo "Build verification passed"
       echo "All builds successful"
   artifacts:
     name: 'build-$CI_COMMIT_SHORT_SHA'
     paths:
       - apps/web/.next
-      - apps/showcase/.next
       - packages/*/dist
     expire_in: 1 day
   rules:
