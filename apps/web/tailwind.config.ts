@@ -1,5 +1,6 @@
 import type { Config } from 'tailwindcss';
 import baseConfig from '@starter/config/tailwind/base';
+import typography from '@tailwindcss/typography';
 
 const config: Config = {
   ...baseConfig,
@@ -9,6 +10,7 @@ const config: Config = {
     './app/**/*.{js,ts,jsx,tsx,mdx}',
     '../../packages/ui/src/**/*.{js,ts,jsx,tsx}',
   ],
+  plugins: [typography],
 };
 
 export default config;
