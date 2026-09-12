@@ -1,5 +1,6 @@
 import * as React from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { Badge } from "./badge"
 import { cn } from "@starter/ui/lib/utils"
 
@@ -38,14 +39,16 @@ export function BlogCard({
       {imageUrl && (
         <div
           className={cn(
-            "w-full overflow-hidden",
+            "w-full overflow-hidden relative",
             featured ? "aspect-[21/9]" : "aspect-video"
           )}
         >
-          <img
+          <Image
             src={imageUrl}
             alt={title}
-            className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+            fill
+            className="object-cover transition-transform duration-200 group-hover:scale-105"
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
         </div>
       )}
@@ -83,7 +86,7 @@ export function BlogCard({
         <div className="flex items-center gap-1 text-primary text-sm font-semibold mt-1">
           <span>Read more</span>
           <span className="transition-transform duration-200 group-hover:translate-x-1 ">
-            ←
+            →
           </span>
         </div>
       </div>
