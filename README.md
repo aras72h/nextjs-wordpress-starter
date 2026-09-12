@@ -21,6 +21,17 @@ nextjs-wordpress-starter/
 
 ---
 
+## Pages
+
+| Route          | Description                                   |
+| -------------- | --------------------------------------------- |
+| `/`            | Homepage with latest posts from WordPress     |
+| `/blog`        | Blog list with category filter and pagination |
+| `/blog/[slug]` | Single post with SEO metadata and JSON-LD     |
+| `/contact`     | Contact form with SMTP email delivery         |
+
+---
+
 ## Prerequisites
 
 - **Node.js** ≥ 20.18.0
@@ -42,10 +53,14 @@ pnpm install
 ### 2. Configure environment
 
 ```bash
+# Root .env — for Docker Compose (MySQL, WordPress)
 cp .env.example .env
+
+# Next.js .env — for the web app
+cp apps/web/.env.example apps/web/.env
 ```
 
-Edit `.env` and set `REVALIDATION_SECRET` to any random string. Everything else has working defaults for local development.
+Edit both files. At minimum set `REVALIDATION_SECRET` to any random string in both.
 
 ### 3. Start the stack
 
@@ -57,11 +72,11 @@ docker compose up -d
 pnpm dev
 ```
 
-| Service | URL |
-|---|---|
-| Next.js | http://localhost:3000 |
+| Service         | URL                             |
+| --------------- | ------------------------------- |
+| Next.js         | http://localhost:3000           |
 | WordPress admin | http://localhost:12080/wp-admin |
-| phpMyAdmin | http://localhost:12081 |
+| phpMyAdmin      | http://localhost:12081          |
 
 ---
 
@@ -92,7 +107,9 @@ pnpm type-check   # Run TypeScript checks across the monorepo
 
 ## Environment Variables
 
-Copy `.env.example` to `.env`. Variables are grouped by service:
+There are two `.env` files:
+
+**Root `.env`** — used by Docker Compose (MySQL, WordPress, webhooks):
 
 ```env
 # MySQL
@@ -104,10 +121,14 @@ MYSQL_PASSWORD=starterpass
 # WordPress ↔ Next.js webhook
 REVALIDATION_SECRET=change-this-to-a-random-string
 NEXTJS_REVALIDATE_URL=http://host.docker.internal:3000/api/revalidate
+```
 
-# Next.js
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
+**`apps/web/.env`** — used by Next.js (copy from `apps/web/.env.example`):
+
+```env
 WORDPRESS_API_URL=http://localhost:12080/wp-json/wp/v2
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+REVALIDATION_SECRET=change-this-to-a-random-string
 
 # Contact form SMTP
 SMTP_HOST=
@@ -117,7 +138,7 @@ SMTP_PASS=
 CONTACT_EMAIL_TO=your@email.com
 ```
 
-Staging and production compose files have no defaults — all variables must be set explicitly in the `.env` file on the server.
+Staging and production compose files have no defaults — all variables must be set explicitly on the server.
 
 ---
 
@@ -125,9 +146,9 @@ Staging and production compose files have no defaults — all variables must be 
 
 Two custom plugins live in `apps/cms/plugins/` and are mounted into the WordPress container automatically via Docker volumes.
 
-| Plugin | Purpose |
-|---|---|
-| `starter-cors` | Adds CORS headers so Next.js can call the WordPress REST API across ports and domains |
+| Plugin            | Purpose                                                                                    |
+| ----------------- | ------------------------------------------------------------------------------------------ |
+| `starter-cors`    | Adds CORS headers so Next.js can call the WordPress REST API across ports and domains      |
 | `starter-webhook` | Notifies Next.js to revalidate its cache whenever a post is published, updated, or deleted |
 
 To allow your production and staging domains, add them to the `$allowed_origins` array in `apps/cms/plugins/starter-cors/starter-cors.php`.
@@ -155,27 +176,28 @@ git push origin v1.0.0
 
 The GitHub Actions workflow builds a Docker image, pushes it to your registry, and deploys to the server via SSH. Set these secrets in your GitHub repository settings:
 
-| Secret | Description |
-|---|---|
-| `SSH_HOST` | Production server IP or hostname |
-| `SSH_USER` | SSH username |
-| `SSH_PRIVATE_KEY` | SSH private key |
-| `REGISTRY_HOST` | Container registry hostname |
-| `REGISTRY_USER` | Registry username |
-| `REGISTRY_PASSWORD` | Registry password |
-| `PROD_SITE_URL` | Public URL of the production site |
+| Secret                   | Description                          |
+| ------------------------ | ------------------------------------ |
+| `SSH_HOST`               | Production server IP or hostname     |
+| `SSH_USER`               | SSH username                         |
+| `SSH_PRIVATE_KEY`        | SSH private key                      |
+| `REGISTRY_HOST`          | Container registry hostname          |
+| `REGISTRY_USER`          | Registry username                    |
+| `REGISTRY_PASSWORD`      | Registry password                    |
+| `PROD_SITE_URL`          | Public URL of the production site    |
 | `PROD_WORDPRESS_API_URL` | WordPress REST API URL on production |
 
 ---
 
 ## Project Status
 
-| Phase | Description | Status |
-|---|---|---|
-| 1 | Monorepo structure, CI/CD, Docker infrastructure | ✅ Complete |
-| 2 | Design system (`packages/ui`, shadcn/ui components) | ✅ Complete |
-| 3 | WordPress setup, custom plugins, REST API | ✅ Complete |
-| 4 | Next.js pages, WordPress data layer, contact form | 🚧 In progress |
+| Phase | Description                                         | Status      |
+| ----- | --------------------------------------------------- | ----------- |
+| 1     | Monorepo structure, CI/CD, Docker infrastructure    | ✅ Complete |
+| 2     | Design system (`packages/ui`, shadcn/ui components) | ✅ Complete |
+| 3     | WordPress setup, custom plugins, REST API           | ✅ Complete |
+| 4     | Next.js pages, WordPress data layer, contact form   | ✅ Complete |
+| 5     | On-demand revalidation                              | 🔜 Next     |
 
 ---
 
