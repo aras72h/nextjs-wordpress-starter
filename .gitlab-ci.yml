@@ -161,7 +161,7 @@ deploy:staging:
   before_script: []
   variables:
     DOCKER_HOST: unix:///var/run/docker.sock
-    IMAGE: 192.168.0.10:5050/nextjs-wordpress-starter/web
+    IMAGE: 192.168.0.10:5050/aras72h/nextjs-wordpress-starter/web
     APP: starter-staging
     PORT: '13000'
   script:
