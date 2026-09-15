@@ -37,21 +37,15 @@ Both scripts expect these variables to be passed from the CI workflow:
 
 ## Server directory structure
 
-Both scripts expect this layout on the target server:
+The deploy script clones the repo on first setup and runs `git pull origin main` on
+every deploy. The server directory is the actual git repo:
 
 ```
-/opt/apps/nextjs-wordpress-starter/          # production
-/opt/apps/nextjs-wordpress-starter-staging/  # staging
+/opt/apps/nextjs-wordpress-starter/    # production (git clone)
+/opt/apps/nextjs-wordpress-starter-staging/  # staging (git clone)
 
-Each directory contains:
-├── docker-compose.prod.yml   (or staging)
-├── .env                      (all required vars, no defaults)
-└── apps/
-    └── cms/
-        ├── plugins/
-        │   ├── starter-cors/
-        │   └── starter-webhook/
-        └── themes/
+Each directory also contains:
+└── .env    # all required vars, not committed, never overwritten by git pull
 ```
 
 ## Rollback
