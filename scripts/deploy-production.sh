@@ -23,7 +23,10 @@ echo ""
 cd "$DEPLOY_DIR"
 
 # ============================================
-# Pre-deployment checks
+# Pull latest code (compose file, plugins, etc.)
+# ============================================
+echo "📦 Pulling latest code from GitHub..."
+git pull origin main
 # ============================================
 echo "🔍 Pre-deployment checks..."
 
