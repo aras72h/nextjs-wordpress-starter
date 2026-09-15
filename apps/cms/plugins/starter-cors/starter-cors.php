@@ -14,9 +14,7 @@ add_action('rest_api_init', function () {
         $allowed_origins = [
             'http://localhost:3000',
             'http://localhost:3001',
-            // Add your production/staging domains here, e.g.:
-            // 'https://yourdomain.com',
-            // 'https://staging.yourdomain.com',
+            'https://nws.arashworks.ir',
         ];
 
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
