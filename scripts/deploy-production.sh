@@ -2,17 +2,21 @@
 set -e
 
 # Production Deployment Script
-# This script is executed on the production server via SSH from GitHub Actions
-# Environment variables REGISTRY_USER and REGISTRY_PASSWORD are passed from the workflow
+# Executed on 94.101.181.37 via SSH from GitHub Actions
+# Environment variables passed from workflow:
+#   REGISTRY_USER     — container registry username
+#   REGISTRY_PASSWORD — container registry password
+#   REGISTRY_HOST     — container registry hostname (e.g. registry.example.com)
+#   VERSION           — image tag to deploy (e.g. v1.0.0)
 
 DEPLOY_DIR="/opt/apps/nextjs-wordpress-starter"
 COMPOSE_FILE="docker-compose.prod.yml"
-REGISTRY="$REGISTRY"
-IMAGE_NAME="starter/web"
-IMAGE_TAG="latest"
+IMAGE="${REGISTRY_HOST}/nextjs-wordpress-starter/web"
+IMAGE_TAG="${VERSION:-latest}"
 
 echo "=============================================="
-echo "🚀 Starter Production Deployment"
+echo "🚀 Production Deployment"
+echo "   Image: ${IMAGE}:${IMAGE_TAG}"
 echo "=============================================="
 echo ""
 
@@ -23,19 +27,14 @@ cd "$DEPLOY_DIR"
 # ============================================
 echo "🔍 Pre-deployment checks..."
 
-# Check disk space
 DISK_USAGE=$(df / | awk 'NR==2 {print $5}' | sed 's/%//')
 echo "📊 Disk usage: ${DISK_USAGE}%"
 
 if [ "$DISK_USAGE" -gt 90 ]; then
-  echo "❌ ERROR: Disk usage is ${DISK_USAGE}% - deployment aborted!"
-  echo "Run cleanup: docker image prune -a -f"
+  echo "❌ ERROR: Disk usage is ${DISK_USAGE}% — deployment aborted"
+  echo "   Run: docker image prune -a -f"
   exit 1
 fi
-
-# Check if containers are running
-echo "📦 Checking container status..."
-docker compose -f "$COMPOSE_FILE" ps
 
 echo "✅ Pre-checks passed"
 echo ""
@@ -43,33 +42,41 @@ echo ""
 # ============================================
 # Docker registry login
 # ============================================
-echo "🔐 Logging into registry..."
-echo "${REGISTRY_PASSWORD}" | docker login "$REGISTRY" \
+echo "🔐 Logging into registry ${REGISTRY_HOST}..."
+echo "${REGISTRY_PASSWORD}" | docker login "${REGISTRY_HOST}" \
   -u "${REGISTRY_USER}" --password-stdin
 
 # ============================================
 # Pull new image
 # ============================================
-echo "📥 Pulling new image..."
-docker pull "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+echo "📥 Pulling ${IMAGE}:${IMAGE_TAG}..."
+docker pull "${IMAGE}:${IMAGE_TAG}"
 
 # ============================================
-# Deploy
+# Update .env with new image tag and deploy
 # ============================================
 echo "🚀 Deploying..."
-docker compose -f "$COMPOSE_FILE" up -d --no-deps nextjs
+
+# Write the image reference into .env so compose picks it up
+sed -i "s|^NEXTJS_IMAGE=.*|NEXTJS_IMAGE=${IMAGE}:${IMAGE_TAG}|" .env
+
+# Restart only the nextjs container — DB and WordPress keep running
+docker compose -f "$COMPOSE_FILE" up -d --no-deps --pull never nextjs
+
+echo "⏳ Waiting for container to be healthy..."
+sleep 5
+docker compose -f "$COMPOSE_FILE" ps nextjs
 
 # ============================================
-# Cleanup old images
+# Cleanup old images (keep last 5 versioned tags)
 # ============================================
-echo "🧹 Cleaning up old images (keeping last 5 versions)..."
-docker images "${REGISTRY}/${IMAGE_NAME}" --format "{{.ID}} {{.Tag}}" | \
-  grep -E "^[a-f0-9]+ v[0-9]" | \
+echo "🧹 Cleaning up old images..."
+docker images "${IMAGE}" --format "{{.ID}} {{.Tag}}" | \
+  grep -E "v[0-9]" | \
   tail -n +6 | \
   awk '{print $1}' | \
-  xargs -r docker rmi -f 2>/dev/null || echo "No old images to remove"
+  xargs -r docker rmi -f 2>/dev/null || true
 
-# Remove dangling images
 docker image prune -f
 
 # ============================================
@@ -77,12 +84,10 @@ docker image prune -f
 # ============================================
 echo ""
 echo "📊 Post-deployment status:"
-echo "  - Disk usage: $(df -h / | awk 'NR==2 {print $5}')"
-echo "  - Starter images: $(docker images | grep starter | wc -l)"
-echo "  - Containers running: $(docker compose -f $COMPOSE_FILE ps | grep Up | wc -l)/3"
+echo "   Disk usage : $(df -h / | awk 'NR==2 {print $5}')"
+echo "   Containers : $(docker compose -f $COMPOSE_FILE ps | grep -c Up || echo 0)/3 running"
 echo ""
-
 echo "=============================================="
 echo "✅ Production deployment complete"
-echo "🌐 URL: https://nextjs-wp.arashworks.ir"
+echo "🌐 https://nws.arashworks.ir"
 echo "=============================================="

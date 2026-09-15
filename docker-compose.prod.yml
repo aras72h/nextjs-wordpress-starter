@@ -31,7 +31,7 @@ services:
       WORDPRESS_DB_NAME: ${MYSQL_DATABASE}
       WORDPRESS_DEBUG: 'false'
       REVALIDATION_SECRET: ${REVALIDATION_SECRET}
-      NEXTJS_REVALIDATE_URL: ${NEXTJS_REVALIDATE_URL}
+      NEXTJS_REVALIDATE_URL: ${NEXTJS_REVALIDATE_URL:-http://nextjs:3000/api/revalidate}
     volumes:
       - wordpress_data:/var/www/html
       - ./apps/cms/plugins/starter-cors:/var/www/html/wp-content/plugins/starter-cors
