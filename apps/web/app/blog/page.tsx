@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { BlogCard } from '@starter/ui';
 import { Pagination } from '@/components/Pagination';
 import {
@@ -39,7 +40,6 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-16">
-
       {/* Header */}
       <div className="mb-10">
         <h1 className="text-4xl font-bold text-text-primary mb-3">Blog</h1>
@@ -51,7 +51,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
       {/* Category filter */}
       {categories.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-10">
-          <a
+          <Link
             href="/blog"
             className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
               !category
@@ -60,9 +60,9 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
             }`}
           >
             All
-          </a>
+          </Link>
           {categories.map((cat) => (
-            <a
+            <Link
               key={cat.id}
               href={`/blog?category=${cat.slug}`}
               className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
@@ -72,7 +72,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
               }`}
             >
               {cat.name}
-            </a>
+            </Link>
           ))}
         </div>
       )}
@@ -100,12 +100,12 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
               : 'No posts published yet.'}
           </p>
           {category && (
-            <a
+            <Link
               href="/blog"
               className="mt-4 inline-block text-primary text-sm font-medium hover:underline"
             >
               View all posts
-            </a>
+            </Link>
           )}
         </div>
       )}
@@ -117,7 +117,6 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
         basePath="/blog"
         searchParams={preservedParams}
       />
-
     </div>
   );
 }
