@@ -5,7 +5,7 @@
 # If a required variable is missing, the container will fail to start.
 services:
   db:
-    image: mysql:8.0
+    image: mysql:8.4
     container_name: starter-mysql-prod
     restart: unless-stopped
     environment:
