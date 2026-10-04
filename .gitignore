@@ -68,3 +68,6 @@ wordpress/wp-config.php
 # Misc
 .vercel
 .contentlayer
+docs/phase-6-production-deployment.md
+docs/phase-7-content-seo.md
+docs/RELEASE.md
