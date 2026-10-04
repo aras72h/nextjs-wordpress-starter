@@ -64,11 +64,11 @@ echo "🚀 Deploying..."
 sed -i "s|^NEXTJS_IMAGE=.*|NEXTJS_IMAGE=${IMAGE}:${IMAGE_TAG}|" .env
 
 # Restart only the nextjs container — DB and WordPress keep running
-docker compose -f "$COMPOSE_FILE" up -d --no-deps --pull never nextjs
+docker compose -f "$COMPOSE_FILE" up -d --pull never
 
-echo "⏳ Waiting for container to be healthy..."
-sleep 5
-docker compose -f "$COMPOSE_FILE" ps nextjs
+echo "⏳ Waiting for containers to be healthy..."
+sleep 10
+docker compose -f "$COMPOSE_FILE" ps
 
 # ============================================
 # Cleanup old images (keep last 5 versioned tags)
